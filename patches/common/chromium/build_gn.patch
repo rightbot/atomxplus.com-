@@ -1,0 +1,51 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ales Pergl <alpergl@microsoft.com>
+Date: Thu, 20 Sep 2018 17:44:29 -0700
+Subject: build_gn.patch
+
+
+diff --git a/build/config/BUILDCONFIG.gn b/build/config/BUILDCONFIG.gn
+index fcc00ee0e49f101cb1b10629747c4c4fa521776d..3232a0360e94e78621f7f672e3de4bdcc5f7b8d5 100644
+--- a/build/config/BUILDCONFIG.gn
++++ b/build/config/BUILDCONFIG.gn
+@@ -123,6 +123,9 @@ if (current_os == "") {
+ #   even if the value is overridden, which is wasteful. See first bullet.
+ 
+ declare_args() {
++  is_electron_build = false
++  is_mas_build = false
++
+   # Set to enable the official build level of optimization. This has nothing
+   # to do with branding, but enables an additional level of optimization above
+   # release (!is_debug). This might be better expressed as a tri-state
+@@ -536,6 +539,7 @@ default_compiler_configs = [
+   "//build/config/compiler:thin_archive",
+   "//build/config/coverage:default_coverage",
+   "//build/config/sanitizers:default_sanitizer_flags",
++  "//electron/build/config:mas_build",
+ ]
+ 
+ if (is_win) {
+diff --git a/build/config/compiler/BUILD.gn b/build/config/compiler/BUILD.gn
+index 959a592317462abb07eefbf03853e1610034c5f3..48f1285c465797bfba37cf2a86cfe21d78c533e6 100644
+--- a/build/config/compiler/BUILD.gn
++++ b/build/config/compiler/BUILD.gn
+@@ -634,12 +634,12 @@ config("compiler") {
+ 
+     # TODO(pcc): Re-enable this flag on Android. This will require libc++ to be
+     # built with ThinLTO (see https://crbug.com/767901) as well as the GVR shim.
+-    if (!is_android) {
+-      cflags += [ "-fwhole-program-vtables" ]
+-      if (!is_win) {
+-        ldflags += [ "-fwhole-program-vtables" ]
+-      }
+-    }
++    # if (!is_android) {
++    #   cflags += [ "-fwhole-program-vtables" ]
++    #   if (!is_win) {
++    #     ldflags += [ "-fwhole-program-vtables" ]
++    #   }
++    # }
+ 
+     # Work-around for http://openradar.appspot.com/20356002
+     if (is_mac) {
