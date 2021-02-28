@@ -1,0 +1,40 @@
+// Copyright 2014 Cheng Zhao. All rights reserved.
+// Use of this source code is governed by MIT license that can be found in the
+// LICENSE file.
+
+#ifndef NATIVE_MATE_PERSISTENT_DICTIONARY_H_
+#define NATIVE_MATE_PERSISTENT_DICTIONARY_H_
+
+#include "native_mate/dictionary.h"
+#include "native_mate/scoped_persistent.h"
+
+namespace mate {
+
+// Like Dictionary, but stores object in persistent handle so you can keep it
+// safely on heap.
+class PersistentDictionary : public Dictionary {
+ public:
+  PersistentDictionary();
+  PersistentDictionary(v8::Isolate* isolate, v8::Local<v8::Object> object);
+  PersistentDictionary(const PersistentDictionary& other);
+  ~PersistentDictionary() override;
+
+  v8::Local<v8::Object> GetHandle() const override;
+
+ private:
+  scoped_refptr<RefCountedPersistent<v8::Object>> handle_;
+};
+}  // namespace mate
+
+namespace gin {
+
+template <>
+struct Converter<mate::PersistentDictionary> {
+  static bool FromV8(v8::Isolate* isolate,
+                     v8::Local<v8::Value> val,
+                     mate::PersistentDictionary* out);
+};
+
+}  // namespace gin
+
+#endif  // NATIVE_MATE_PERSISTENT_DICTIONARY_H_

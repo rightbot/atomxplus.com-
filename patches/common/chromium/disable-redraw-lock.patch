@@ -1,0 +1,76 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Heilig Benedek <benecene@gmail.com>
+Date: Thu, 20 Sep 2018 17:47:54 -0700
+Subject: disable-redraw-lock.patch
+
+Chromium uses a custom window titlebar implementation on Windows when DWM
+is disabled (Windows 7 and earlier, non Aero theme). The native titlebar
+sometimes painted over this custom titlebar, so a workaround was put in
+place to lock redraws in reaction to certain events if DWM is disabled,
+since the code assumes that in that case, the custom titlebar is painted.
+Electron forces the use of the native titlebar, which the workaround doesn't
+take into account, and still locks redraws, causing weird repainting issues
+in electron (and other applications). This patch provides a way to disable
+the redraw locking mechanism, which fixes these issues. The electron issue
+can be found at https://github.com/electron/electron/issues/1821
+
+diff --git a/ui/views/win/hwnd_message_handler.cc b/ui/views/win/hwnd_message_handler.cc
+index b3c01542f183a247df30e5b96bbba8298d828153..8fe7e1142cb79cb3abf3cbc1cabc73b27695a63a 100644
+--- a/ui/views/win/hwnd_message_handler.cc
++++ b/ui/views/win/hwnd_message_handler.cc
+@@ -288,6 +288,10 @@ const int kSynthesizedMouseMessagesTimeDifference = 500;
+ 
+ }  // namespace
+ 
++bool HWNDMessageHandlerDelegate::HasNativeFrame() const {
++  return false;
++}
++
+ // A scoping class that prevents a window from being able to redraw in response
+ // to invalidations that may occur within it for the lifetime of the object.
+ //
+@@ -339,6 +343,7 @@ class HWNDMessageHandler::ScopedRedrawLock {
+         cancel_unlock_(false),
+         should_lock_(owner_->IsVisible() && !owner->HasChildRenderingWindow() &&
+                      ::IsWindow(hwnd_) &&
++                     !owner_->HasNativeFrame() &&
+                      (!(GetWindowLong(hwnd_, GWL_STYLE) & WS_CAPTION) ||
+                       !ui::win::IsAeroGlassEnabled())) {
+     if (should_lock_)
+@@ -940,6 +945,10 @@ bool HWNDMessageHandler::HasChildRenderingWindow() {
+       hwnd());
+ }
+ 
++bool HWNDMessageHandler::HasNativeFrame() {
++  return delegate_->HasNativeFrame();
++}
++
+ ////////////////////////////////////////////////////////////////////////////////
+ // HWNDMessageHandler, gfx::WindowImpl overrides:
+ 
+diff --git a/ui/views/win/hwnd_message_handler.h b/ui/views/win/hwnd_message_handler.h
+index 2efafcdba85f2f8c940bb5fc2b07f1ec1abdb3c9..ce3fdf8ec003f0b18fe94368b18f6efca5d6d7b4 100644
+--- a/ui/views/win/hwnd_message_handler.h
++++ b/ui/views/win/hwnd_message_handler.h
+@@ -182,6 +182,8 @@ class VIEWS_EXPORT HWNDMessageHandler : public gfx::WindowImpl,
+   typedef std::set<DWORD> TouchIDs;
+   enum class DwmFrameState { OFF, ON };
+ 
++  bool HasNativeFrame();
++
+   // Overridden from WindowImpl:
+   HICON GetDefaultWindowIcon() const override;
+   HICON GetSmallWindowIcon() const override;
+diff --git a/ui/views/win/hwnd_message_handler_delegate.h b/ui/views/win/hwnd_message_handler_delegate.h
+index 17907e675bb1d9cf4bf2bff1d0668d36fdf42df0..0ca9cb470df588bb952faada6c658335dc76ed06 100644
+--- a/ui/views/win/hwnd_message_handler_delegate.h
++++ b/ui/views/win/hwnd_message_handler_delegate.h
+@@ -45,6 +45,8 @@ class VIEWS_EXPORT HWNDMessageHandlerDelegate {
+   // True if the widget associated with this window has a non-client view.
+   virtual bool HasNonClientView() const = 0;
+ 
++  virtual bool HasNativeFrame() const;
++
+   // Returns who we want to be drawing the frame. Either the system (Windows)
+   // will handle it or Chrome will custom draw it.
+   virtual FrameMode GetFrameMode() const = 0;
