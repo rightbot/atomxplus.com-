@@ -1,0 +1,66 @@
+build_cloud: electron-16
+image: electron-16-vs2017-15.4.5
+build_script:
+- ps: >-
+    echo "Build worker image $env:APPVEYOR_BUILD_WORKER_IMAGE"
+
+    &"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe"
+
+    if($env:SKIP_GYP_BUILD -eq "true") {
+      Write-warning "Skipping debug build for older branch"; Exit-AppveyorBuild
+    } elseif(($env:APPVEYOR_PULL_REQUEST_HEAD_REPO_NAME -split "/")[0] -eq ($env:APPVEYOR_REPO_NAME -split "/")[0]) {
+      Write-warning "Skipping PR build for branch"; Exit-AppveyorBuild
+    } else {
+      Add-Path "$env:ProgramFiles (x86)\Windows Kits\10\Debuggers\x64"
+      $env:path = "$env:ProgramFiles (x86)\Windows Kits\10\Debuggers\x64;$env:path"
+      if($env:APPVEYOR_SCHEDULED_BUILD -eq 'True')  {
+        $env:RUN_RELEASE_BUILD = "1"
+      }
+      $Message = (git log --format=%B -n 1 HEAD) | Out-String
+      if ((Test-Path Env:\RUN_RELEASE_BUILD)) {
+        $env:ELECTRON_RELEASE = '1'
+        Write-Output "release build triggered from api"
+      }
+      if ((Test-Path Env:\ELECTRON_RELEASE)) {
+        Write-Output "Running release build"
+        python script\bootstrap.py --target_arch=$env:TARGET_ARCH
+        python script\build.py -c R
+        python script\create-dist.py
+      } else {
+        Write-Output "Running debug build"
+        python script\bootstrap.py --target_arch=$env:TARGET_ARCH --dev
+        python script\build.py -c D
+      }
+      if ($? -ne 'True') {
+        throw "Build failed with exit code $?"
+      } else {
+        "Build succeeded."
+      }
+      Push-AppveyorArtifact out
+    }
+test_script:
+- ps: >-
+    if (Test-Path Env:\ELECTRON_RELEASE) {
+      Write-Output "Skipping tests for release build"
+    } else {
+      $env:RUN_TESTS="true"
+      Remove-Item Env:\ELECTRON_ENABLE_LOGGING
+      Remove-Item Env:\ELECTRON_ENABLE_STACK_DUMPING
+      Write-Output "Running tests for debug build"
+    }
+- if "%RUN_TESTS%"=="true" ( echo Running test suite & python script\test.py --ci --rebuild_native_modules)
+- if "%RUN_TESTS%"=="true" ( echo Running verify ffmpeg & python script\verify-ffmpeg.py)
+artifacts:
+- path: test-results.xml
+  name: test-results.xml
+deploy_script:
+- ps: >-
+    if (Test-Path Env:\ELECTRON_RELEASE) {
+      if (Test-Path Env:\RUN_RELEASE_BUILD) {
+        Write-Output "Uploading Electron release distribution to s3"
+        & python script\upload.py --upload_to_s3
+      } else {
+        Write-Output "Uploading Electron release distribution to github releases"
+        & python script\upload.py
+      }
+    }
