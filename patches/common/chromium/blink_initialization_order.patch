@@ -1,0 +1,18 @@
+diff --git a/third_party/blink/renderer/bindings/core/v8/local_window_proxy.cc b/third_party/blink/renderer/bindings/core/v8/local_window_proxy.cc
+index 5c00e3e935b2..43f882eb0883 100644
+--- a/third_party/blink/renderer/bindings/core/v8/local_window_proxy.cc
++++ b/third_party/blink/renderer/bindings/core/v8/local_window_proxy.cc
+@@ -171,11 +171,11 @@ void LocalWindowProxy::Initialize() {
+                  GetFrame()->IsMainFrame());
+     MainThreadDebugger::Instance()->ContextCreated(script_state_.get(),
+                                                    GetFrame(), origin);
++
++    InstallConditionalFeatures();
+     GetFrame()->Client()->DidCreateScriptContext(context, world_->GetWorldId());
+   }
+ 
+-  InstallConditionalFeatures();
+-
+   if (World().IsMainWorld()) {
+     GetFrame()->Loader().DispatchDidClearWindowObjectInMainWorld();
+   }

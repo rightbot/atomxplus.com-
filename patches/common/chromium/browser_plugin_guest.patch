@@ -1,0 +1,18 @@
+diff --git a/content/browser/browser_plugin/browser_plugin_guest.cc b/content/browser/browser_plugin/browser_plugin_guest.cc
+index a0bc9305e62d..7f022f6cfda7 100644
+--- a/content/browser/browser_plugin/browser_plugin_guest.cc
++++ b/content/browser/browser_plugin/browser_plugin_guest.cc
+@@ -207,8 +207,11 @@ void BrowserPluginGuest::Init() {
+ 
+   WebContentsImpl* owner_web_contents = static_cast<WebContentsImpl*>(
+       delegate_->GetOwnerWebContents());
+-  owner_web_contents->CreateBrowserPluginEmbedderIfNecessary();
+-  InitInternal(BrowserPluginHostMsg_Attach_Params(), owner_web_contents);
++  if (nullptr != owner_web_contents)
++  {
++      owner_web_contents->CreateBrowserPluginEmbedderIfNecessary();
++      InitInternal(BrowserPluginHostMsg_Attach_Params(), owner_web_contents);
++  }
+ }
+ 
+ base::WeakPtr<BrowserPluginGuest> BrowserPluginGuest::AsWeakPtr() {

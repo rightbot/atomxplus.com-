@@ -1,0 +1,12 @@
+diff --git a/third_party/blink/renderer/core/workers/worker_classic_script_loader.cc b/third_party/blink/renderer/core/workers/worker_classic_script_loader.cc
+index 4b47f551f366..227c58a5629d 100644
+--- a/third_party/blink/renderer/core/workers/worker_classic_script_loader.cc
++++ b/third_party/blink/renderer/core/workers/worker_classic_script_loader.cc
+@@ -246,7 +246,6 @@ void WorkerClassicScriptLoader::ProcessContentSecurityPolicy(
+   // document (which is implemented in WorkerMessagingProxy, and
+   // m_contentSecurityPolicy should be left as nullptr to inherit the policy).
+   if (!response.Url().ProtocolIs("blob") &&
+-      !response.Url().ProtocolIs("file") &&
+       !response.Url().ProtocolIs("filesystem")) {
+     content_security_policy_ = ContentSecurityPolicy::Create();
+     content_security_policy_->SetOverrideURLForSelf(response.Url());

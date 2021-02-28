@@ -1,0 +1,18 @@
+diff --git a/content/gpu/gpu_main.cc b/content/gpu/gpu_main.cc
+index e6a589fb90e0..64ff5e248bd7 100644
+--- a/content/gpu/gpu_main.cc
++++ b/content/gpu/gpu_main.cc
+@@ -276,8 +276,10 @@ int GpuMain(const MainFunctionParams& parameters) {
+     std::unique_ptr<base::MessagePump> pump(new base::MessagePumpNSRunLoop());
+     main_message_loop.reset(new base::MessageLoop(std::move(pump)));
+ 
++#ifndef MAS_BUILD
+     // Tell LaunchServices to continue without a connection to the daemon.
+     _LSSetApplicationLaunchServicesServerConnectionStatus(0, nullptr);
++#endif
+ #else
+     main_message_loop.reset(
+         new base::MessageLoop(base::MessageLoop::TYPE_DEFAULT));
+-- 
+2.17.0
+

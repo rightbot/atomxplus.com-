@@ -1,0 +1,18 @@
+diff --git a/third_party/boringssl/BUILD.gn b/third_party/boringssl/BUILD.gn
+index d31a9f29fa9c..dea5a6403f4c 100644
+--- a/third_party/boringssl/BUILD.gn
++++ b/third_party/boringssl/BUILD.gn
+@@ -46,6 +46,13 @@ config("no_asm_config") {
+ 
+ all_sources = crypto_sources + ssl_sources
+ all_headers = crypto_headers + ssl_headers
++if (is_electron_build) {
++  # Needed to build a nodejs-compatible boringssl.
++  all_sources += [
++    "src/decrepit/evp/evp_do_all.c",
++    "src/decrepit/xts/xts.c",
++  ]
++}
+ 
+ # Windows' assembly is built with Yasm. The other platforms use the platform
+ # assembler.

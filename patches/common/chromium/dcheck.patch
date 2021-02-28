@@ -1,0 +1,247 @@
+diff --git a/base/logging.h b/base/logging.h
+index 29960599a5c6..7352201e7b66 100644
+--- a/base/logging.h
++++ b/base/logging.h
+@@ -874,7 +874,7 @@ const LogSeverity LOG_DCHECK = LOG_FATAL;
+ 
+ #else  // !(defined(_PREFAST_) && defined(OS_WIN))
+ 
+-#if DCHECK_IS_ON()
++#if DCHECK_IS_ON() && !defined(ELECTRON_NO_DCHECK)
+ 
+ #define DCHECK(condition)                                           \
+   LAZY_STREAM(LOG_STREAM(DCHECK), !ANALYZER_ASSUME_TRUE(condition)) \
+diff --git a/base/memory/weak_ptr.cc b/base/memory/weak_ptr.cc
+index d2a7d89e5667..def40703ea25 100644
+--- a/base/memory/weak_ptr.cc
++++ b/base/memory/weak_ptr.cc
+@@ -23,8 +23,8 @@ void WeakReference::Flag::Invalidate() {
+ }
+ 
+ bool WeakReference::Flag::IsValid() const {
+-  DCHECK(sequence_checker_.CalledOnValidSequence())
+-      << "WeakPtrs must be checked on the same sequenced thread.";
++  // DCHECK(sequence_checker_.CalledOnValidSequence())
++  //    << "WeakPtrs must be checked on the same sequenced thread.";
+   return is_valid_;
+ }
+ 
+diff --git a/base/process/kill_win.cc b/base/process/kill_win.cc
+index 7a664429bcd3..26f49dc3d1e7 100644
+--- a/base/process/kill_win.cc
++++ b/base/process/kill_win.cc
+@@ -23,7 +23,7 @@ TerminationStatus GetTerminationStatus(ProcessHandle handle, int* exit_code) {
+   DWORD tmp_exit_code = 0;
+ 
+   if (!::GetExitCodeProcess(handle, &tmp_exit_code)) {
+-    DPLOG(FATAL) << "GetExitCodeProcess() failed";
++    // DPLOG(FATAL) << "GetExitCodeProcess() failed";
+ 
+     // This really is a random number.  We haven't received any
+     // information about the exit code, presumably because this
+diff --git a/base/process/process_metrics_win.cc b/base/process/process_metrics_win.cc
+index 18ef58a725c3..239f319c8b4c 100644
+--- a/base/process/process_metrics_win.cc
++++ b/base/process/process_metrics_win.cc
+@@ -153,10 +153,9 @@ bool ProcessMetrics::GetIOCounters(IoCounters* io_counters) const {
+ ProcessMetrics::ProcessMetrics(ProcessHandle process) {
+   if (process) {
+     HANDLE duplicate_handle = INVALID_HANDLE_VALUE;
+-    BOOL result = ::DuplicateHandle(::GetCurrentProcess(), process,
+-                                    ::GetCurrentProcess(), &duplicate_handle,
+-                                    PROCESS_QUERY_INFORMATION, FALSE, 0);
+-    DPCHECK(result);
++    ::DuplicateHandle(::GetCurrentProcess(), process,
++                      ::GetCurrentProcess(), &duplicate_handle,
++                      PROCESS_QUERY_INFORMATION, FALSE, 0);
+     process_.Set(duplicate_handle);
+   }
+ }
+diff --git a/components/viz/service/display/program_binding.h b/components/viz/service/display/program_binding.h
+index 8b28c57f854e..a0e7056af23f 100644
+--- a/components/viz/service/display/program_binding.h
++++ b/components/viz/service/display/program_binding.h
+@@ -433,7 +433,7 @@ class VIZ_SERVICE_EXPORT Program : public ProgramBindingBase {
+     if (!ProgramBindingBase::Init(context_provider->ContextGL(),
+                                   vertex_shader_.GetShaderString(),
+                                   fragment_shader_.GetShaderString())) {
+-      DCHECK(IsContextLost(context_provider->ContextGL()));
++      // DCHECK(IsContextLost(context_provider->ContextGL()));
+       return;
+     }
+ 
+@@ -445,7 +445,7 @@ class VIZ_SERVICE_EXPORT Program : public ProgramBindingBase {
+ 
+     // Link after binding uniforms
+     if (!Link(context_provider->ContextGL())) {
+-      DCHECK(IsContextLost(context_provider->ContextGL()));
++      // DCHECK(IsContextLost(context_provider->ContextGL()));
+       return;
+     }
+ 
+diff --git a/content/browser/frame_host/navigation_controller_impl.cc b/content/browser/frame_host/navigation_controller_impl.cc
+index 74ff6b4286c2..02bf1c55d86f 100644
+--- a/content/browser/frame_host/navigation_controller_impl.cc
++++ b/content/browser/frame_host/navigation_controller_impl.cc
+@@ -1083,8 +1083,10 @@ NavigationType NavigationControllerImpl::ClassifyNavigation(
+     return NAVIGATION_TYPE_NEW_SUBFRAME;
+   }
+ 
+-  // We only clear the session history when navigating to a new page.
+-  DCHECK(!params.history_list_was_cleared);
++  // Electron does its own book keeping of navigation entries and we
++  // expect content to not track any, by clearing history list for
++  // all navigations.
++  // DCHECK(!params.history_list_was_cleared);
+ 
+   if (rfh->GetParent()) {
+     // All manual subframes would be did_create_new_entry and handled above, so
+@@ -1305,7 +1307,10 @@ void NavigationControllerImpl::RendererDidNavigateToNewPage(
+     new_entry->GetFavicon() = GetLastCommittedEntry()->GetFavicon();
+   }
+ 
+-  DCHECK(!params.history_list_was_cleared || !replace_entry);
++  // Electron does its own book keeping of navigation entries and we
++  // expect content to not track any, by clearing history list for
++  // all navigations.
++  // DCHECK(!params.history_list_was_cleared || !replace_entry);
+   // The browser requested to clear the session history when it initiated the
+   // navigation. Now we know that the renderer has updated its state accordingly
+   // and it is safe to also clear the browser side history.
+diff --git a/content/browser/frame_host/render_frame_host_impl.cc b/content/browser/frame_host/render_frame_host_impl.cc
+index cd755cbc3f2c..321a12f74202 100644
+--- a/content/browser/frame_host/render_frame_host_impl.cc
++++ b/content/browser/frame_host/render_frame_host_impl.cc
+@@ -2345,8 +2345,10 @@ void RenderFrameHostImpl::AllowBindings(int bindings_flags) {
+   }
+ 
+   enabled_bindings_ |= bindings_flags;
+-  if (GetParent())
+-    DCHECK_EQ(GetParent()->GetEnabledBindings(), GetEnabledBindings());
++  // WebUI in sub frames require binding policy while the parent does not,
++  // Fix this when we use OOPIF in Electron.
++  // if (GetParent())
++  //  DCHECK_EQ(GetParent()->GetEnabledBindings(), GetEnabledBindings());
+ 
+   if (render_frame_created_) {
+     if (!frame_bindings_control_)
+diff --git a/content/browser/renderer_host/render_widget_host_view_cocoa.mm b/content/browser/renderer_host/render_widget_host_view_cocoa.mm
+index d86576cc36ac..5b4ae0732914 100644
+--- a/content/browser/renderer_host/render_widget_host_view_cocoa.mm
++++ b/content/browser/renderer_host/render_widget_host_view_cocoa.mm
+@@ -650,8 +650,8 @@ void ExtractUnderlines(NSAttributedString* string,
+   if (EventIsReservedBySystem(theEvent))
+     return;
+ 
+-  DCHECK(eventType != NSKeyDown ||
+-         !equiv == !(modifierFlags & NSCommandKeyMask));
++  // DCHECK(eventType != NSKeyDown ||
++  //       !equiv == !(modifierFlags & NSCommandKeyMask));
+ 
+   if (eventType == NSFlagsChanged) {
+     // Ignore NSFlagsChanged events from the NumLock and Fn keys as
+diff --git a/ppapi/host/ppapi_host.cc b/ppapi/host/ppapi_host.cc
+index f3c68fab3de6..b8609daf3ef9 100644
+--- a/ppapi/host/ppapi_host.cc
++++ b/ppapi/host/ppapi_host.cc
+@@ -240,7 +240,7 @@ void PpapiHost::OnHostMsgResourceCreated(
+       CreateResourceHost(params.pp_resource(), instance, nested_msg);
+ 
+   if (!resource_host.get()) {
+-    NOTREACHED();
++    // NOTREACHED();
+     return;
+   }
+ 
+diff --git a/third_party/blink/renderer/core/dom/node.cc b/third_party/blink/renderer/core/dom/node.cc
+index ca47b2d09693..b4b6ce96209b 100644
+--- a/third_party/blink/renderer/core/dom/node.cc
++++ b/third_party/blink/renderer/core/dom/node.cc
+@@ -2535,7 +2535,7 @@ StaticNodeList* Node::getDestinationInsertionPoints() {
+ 
+ HTMLSlotElement* Node::AssignedSlot() const {
+   // assignedSlot doesn't need to call updateDistribution().
+-  DCHECK(!IsPseudoElement());
++  // DCHECK(!IsPseudoElement());
+   if (ShadowRoot* root = V1ShadowRootOfParent())
+     return root->AssignedSlotFor(*this);
+   return nullptr;
+diff --git a/third_party/blink/renderer/core/loader/BUILD.gn b/third_party/blink/renderer/core/loader/BUILD.gn
+index 82f6e8bc9d33..ccad95d61a4a 100644
+--- a/third_party/blink/renderer/core/loader/BUILD.gn
++++ b/third_party/blink/renderer/core/loader/BUILD.gn
+@@ -129,4 +129,11 @@ blink_core_sources("loader") {
+   public_deps = [
+     "//third_party/blink/renderer/platform",
+   ]
++
++  if (is_electron_build) {
++    if (!defined(defines)) {
++      defines = []
++    }
++    defines += [ "ELECTRON_NO_DCHECK" ]
++  }
+ }
+diff --git a/third_party/blink/renderer/platform/wtf/text/string_impl.h b/third_party/blink/renderer/platform/wtf/text/string_impl.h
+index 158d81ca9ba2..1b6aafecadef 100644
+--- a/third_party/blink/renderer/platform/wtf/text/string_impl.h
++++ b/third_party/blink/renderer/platform/wtf/text/string_impl.h
+@@ -258,21 +258,21 @@ class WTF_EXPORT StringImpl {
+   }
+ 
+   ALWAYS_INLINE bool HasOneRef() const {
+-#if DCHECK_IS_ON()
++#if 0
+     DCHECK(IsStatic() || verifier_.IsSafeToUse()) << AsciiForDebugging();
+ #endif
+     return ref_count_ == 1;
+   }
+ 
+   ALWAYS_INLINE void AddRef() const {
+-#if DCHECK_IS_ON()
++#if 0
+     DCHECK(IsStatic() || verifier_.OnRef(ref_count_)) << AsciiForDebugging();
+ #endif
+     ++ref_count_;
+   }
+ 
+   ALWAYS_INLINE void Release() const {
+-#if DCHECK_IS_ON()
++#if 0
+     DCHECK(IsStatic() || verifier_.OnDeref(ref_count_))
+         << AsciiForDebugging() << " " << CurrentThread();
+ #endif
+diff --git a/ui/base/clipboard/clipboard_win.cc b/ui/base/clipboard/clipboard_win.cc
+index e49dd8c81270..9e61c901cd2d 100644
+--- a/ui/base/clipboard/clipboard_win.cc
++++ b/ui/base/clipboard/clipboard_win.cc
+@@ -905,9 +905,9 @@ void ClipboardWin::WriteBitmapFromHandle(HBITMAP source_hbitmap,
+ }
+ 
+ void ClipboardWin::WriteToClipboard(unsigned int format, HANDLE handle) {
+-  DCHECK(clipboard_owner_->hwnd() != NULL);
++  // DCHECK(clipboard_owner_->hwnd() != NULL);
+   if (handle && !::SetClipboardData(format, handle)) {
+-    DCHECK(ERROR_CLIPBOARD_NOT_OPEN != GetLastError());
++    // DCHECK(ERROR_CLIPBOARD_NOT_OPEN != GetLastError());
+     FreeData(format, handle);
+   }
+ }
+diff --git a/url/BUILD.gn b/url/BUILD.gn
+index c4deb10db9ca..ecc068d7447a 100644
+--- a/url/BUILD.gn
++++ b/url/BUILD.gn
+@@ -98,6 +98,10 @@ component("url") {
+     ]
+     deps += [ "//third_party/icu" ]
+   }
++
++  if (is_electron_build) {
++    defines += [ "ELECTRON_NO_DCHECK" ]
++  }
+ }
+ 
+ if (is_android) {
+-- 
+2.17.0
+
