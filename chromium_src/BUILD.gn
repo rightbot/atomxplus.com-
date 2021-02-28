@@ -1,0 +1,126 @@
+# Copyright (c) 2018 GitHub, Inc.
+# Use of this source code is governed by the MIT license that can be
+# found in the LICENSE file.
+
+import("//electron/buildflags/buildflags.gni")
+import("//printing/buildflags/buildflags.gni")
+import("//third_party/widevine/cdm/widevine.gni")
+
+# Builds some of the chrome sources that Electron depends
+# on unconditionally.
+source_set("chrome") {
+  visibility = [ "//electron:electron_lib" ]
+  sources = [
+    "//chrome/browser/browser_process.cc",
+    "//chrome/browser/browser_process.h",
+    "//chrome/browser/icon_loader.cc",
+    "//chrome/browser/icon_loader.h",
+    "//chrome/browser/icon_loader_mac.mm",
+    "//chrome/browser/icon_loader_win.cc",
+    "//chrome/browser/icon_manager.cc",
+    "//chrome/browser/icon_manager.h",
+    "//chrome/browser/net/chrome_mojo_proxy_resolver_factory.cc",
+    "//chrome/browser/net/chrome_mojo_proxy_resolver_factory.h",
+    "//chrome/browser/net/chrome_net_log_helper.cc",
+    "//chrome/browser/net/chrome_net_log_helper.h",
+    "//chrome/browser/net/proxy_config_monitor.cc",
+    "//chrome/browser/net/proxy_config_monitor.h",
+    "//chrome/browser/net/proxy_service_factory.cc",
+    "//chrome/browser/net/proxy_service_factory.h",
+    "//chrome/browser/ssl/security_state_tab_helper.cc",
+    "//chrome/browser/ssl/security_state_tab_helper.h",
+    "//chrome/common/chrome_constants.cc",
+    "//chrome/common/chrome_constants.h",
+    "//chrome/common/chrome_switches.cc",
+    "//chrome/common/chrome_switches.h",
+    "//chrome/common/secure_origin_whitelist.cc",
+    "//chrome/common/secure_origin_whitelist.h",
+  ]
+  public_deps = [
+    "//content/public/browser",
+  ]
+  deps = [
+    "//chrome/common",
+    "//components/proxy_config",
+    "//components/security_state/content",
+  ]
+
+  if (is_linux) {
+    sources += [ "//chrome/browser/icon_loader_auralinux.cc" ]
+  }
+
+  if (enable_desktop_capturer) {
+    sources += [
+      "//chrome/browser/media/webrtc/desktop_media_list.h",
+      "//chrome/browser/media/webrtc/desktop_media_list_base.cc",
+      "//chrome/browser/media/webrtc/desktop_media_list_base.h",
+      "//chrome/browser/media/webrtc/desktop_media_list_observer.h",
+      "//chrome/browser/media/webrtc/native_desktop_media_list.cc",
+      "//chrome/browser/media/webrtc/native_desktop_media_list.h",
+    ]
+    deps += [ "//ui/snapshot" ]
+  }
+
+  if (enable_basic_printing) {
+    sources += [
+      "//chrome/browser/printing/print_job.cc",
+      "//chrome/browser/printing/print_job.h",
+      "//chrome/browser/printing/print_job_manager.cc",
+      "//chrome/browser/printing/print_job_manager.h",
+      "//chrome/browser/printing/print_job_worker.cc",
+      "//chrome/browser/printing/print_job_worker.h",
+      "//chrome/browser/printing/print_view_manager_base.cc",
+      "//chrome/browser/printing/print_view_manager_base.h",
+      "//chrome/browser/printing/print_view_manager_basic.cc",
+      "//chrome/browser/printing/print_view_manager_basic.h",
+      "//chrome/browser/printing/printer_query.cc",
+      "//chrome/browser/printing/printer_query.h",
+      "//chrome/browser/printing/printing_message_filter.cc",
+      "//chrome/browser/printing/printing_message_filter.h",
+    ]
+    deps += [
+      "//chrome/services/printing:lib",
+      "//components/keyed_service/content",
+      "//components/printing/browser",
+      "//components/printing/common",
+      "//components/printing/renderer",
+      "//components/services/pdf_compositor",
+      "//components/services/pdf_compositor/public/cpp:factory",
+      "//components/services/pdf_compositor/public/interfaces",
+      "//printing",
+    ]
+
+    if (is_win) {
+      sources += [
+        "//chrome/browser/printing/pdf_to_emf_converter.cc",
+        "//chrome/browser/printing/pdf_to_emf_converter.h",
+        "//chrome/utility/printing_handler.cc",
+        "//chrome/utility/printing_handler.h",
+      ]
+    }
+  }
+
+  if (enable_tts) {
+    sources += [
+      "//chrome/browser/speech/tts_controller.h",
+      "//chrome/browser/speech/tts_controller_impl.cc",
+      "//chrome/browser/speech/tts_controller_impl.h",
+      "//chrome/browser/speech/tts_mac.mm",
+      "//chrome/browser/speech/tts_message_filter.cc",
+      "//chrome/browser/speech/tts_message_filter.h",
+      "//chrome/browser/speech/tts_platform.cc",
+      "//chrome/browser/speech/tts_platform.h",
+      "//chrome/browser/speech/tts_win.cc",
+      "//chrome/common/tts_messages.h",
+      "//chrome/common/tts_utterance_request.cc",
+      "//chrome/common/tts_utterance_request.h",
+      "//chrome/renderer/tts_dispatcher.cc",
+      "//chrome/renderer/tts_dispatcher.h",
+    ]
+
+    if (is_linux) {
+      sources += [ "//chrome/browser/speech/tts_linux.cc" ]
+      deps += [ "//third_party/speech-dispatcher" ]
+    }
+  }
+}
