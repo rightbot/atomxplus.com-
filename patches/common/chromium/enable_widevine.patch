@@ -1,0 +1,25 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Aleksei Kuzmin <alkuzmin@microsoft.com>
+Date: Thu, 20 Sep 2018 17:50:03 -0700
+Subject: enable_widevine.patch
+
+Turns `enable_widevine` flag on by default on Mac and Windows.
+Electron needs that flag to be enabled on those paltforms,
+but there's no way to conditionally set it during a `gn gen` call.
+
+diff --git a/third_party/widevine/cdm/widevine.gni b/third_party/widevine/cdm/widevine.gni
+index e10d9b9b8d2975a731adfee2eb0086afd7975f97..844320dc66cd5781e218d5ca8084f5185a5e331d 100644
+--- a/third_party/widevine/cdm/widevine.gni
++++ b/third_party/widevine/cdm/widevine.gni
+@@ -6,9 +6,8 @@ import("//build/config/chrome_build.gni")
+ import("//media/media_options.gni")
+ 
+ declare_args() {
+-  # Enables Widevine key system support. Enabled by default in Google Chrome or
+-  # on Android. Can be optionally enabled in Chromium.
+-  enable_widevine = is_chrome_branded || is_android
++  # Allow Widevine key system support in Chromium.
++  enable_widevine = is_mac || is_win
+ }
+ 
+ # Widevine CDM is available as a library CDM on the following platforms and

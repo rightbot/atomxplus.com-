@@ -1,0 +1,44 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Cheng Zhao <zcbenz@gmail.com>
+Date: Thu, 20 Sep 2018 17:45:14 -0700
+Subject: browser_compositor_mac.patch
+
+
+diff --git a/content/browser/renderer_host/browser_compositor_view_mac.h b/content/browser/renderer_host/browser_compositor_view_mac.h
+index da7e3391774e14550f7adf5956ca44b8b880662e..8b399558ad2469f6452e1793e8834d5c4f93adeb 100644
+--- a/content/browser/renderer_host/browser_compositor_view_mac.h
++++ b/content/browser/renderer_host/browser_compositor_view_mac.h
+@@ -60,6 +60,8 @@ class CONTENT_EXPORT BrowserCompositorMac : public DelegatedFrameHostClient,
+   // These will not return nullptr until Destroy is called.
+   DelegatedFrameHost* GetDelegatedFrameHost();
+ 
++  ui::Layer* GetRootLayer() { return root_layer_.get(); }
++
+   // Force a new surface id to be allocated. Returns true if the
+   // RenderWidgetHostImpl sent the resulting surface id to the renderer.
+   bool ForceNewSurfaceId();
+@@ -68,6 +70,7 @@ class CONTENT_EXPORT BrowserCompositorMac : public DelegatedFrameHostClient,
+   // no valid frame is available.
+   const gfx::CALayerParams* GetLastCALayerParams() const;
+ 
++  ui::Compositor* GetCompositor();
+   void DidCreateNewRendererCompositorFrameSink(
+       viz::mojom::CompositorFrameSinkClient* renderer_compositor_frame_sink);
+   void OnDidNotProduceFrame(const viz::BeginFrameAck& ack);
+diff --git a/content/browser/renderer_host/browser_compositor_view_mac.mm b/content/browser/renderer_host/browser_compositor_view_mac.mm
+index 21d3b34cc13f3471dcef456ec92ad7c1c4a012f4..cffbf04e781cff2d10283c7ef2093959f25e432b 100644
+--- a/content/browser/renderer_host/browser_compositor_view_mac.mm
++++ b/content/browser/renderer_host/browser_compositor_view_mac.mm
+@@ -79,6 +79,12 @@ BrowserCompositorMac::~BrowserCompositorMac() {
+   DCHECK_EQ(1u, num_erased);
+ }
+ 
++ui::Compositor* BrowserCompositorMac::GetCompositor() {
++  if (recyclable_compositor_)
++    return recyclable_compositor_->compositor();
++  return nullptr;
++}
++
+ DelegatedFrameHost* BrowserCompositorMac::GetDelegatedFrameHost() {
+   DCHECK(delegated_frame_host_);
+   return delegated_frame_host_.get();

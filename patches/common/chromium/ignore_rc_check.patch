@@ -1,0 +1,25 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Zac Walker <zac.walker@microsoft.com>
+Date: Thu, 20 Sep 2018 17:49:55 -0700
+Subject: ignore_rc_check.patch
+
+Dont compare RC.exe and RC.py output.
+FIXME: It has to be reverted once the script is fixed.
+
+diff --git a/build/toolchain/win/tool_wrapper.py b/build/toolchain/win/tool_wrapper.py
+index 6f01ebf4026444d405cb3b837b21a6370c357180..d03be4244bfa37953b55783f2e245df76b634522 100644
+--- a/build/toolchain/win/tool_wrapper.py
++++ b/build/toolchain/win/tool_wrapper.py
+@@ -220,7 +220,11 @@ class WinTool(object):
+       if rc_exe_exit_code == 0:
+         import filecmp
+         # Strip "/fo" prefix.
+-        assert filecmp.cmp(rc_res_output[3:], rcpy_res_output[3:])
++        # ------
++        # Temporarily ignore compares
++        # Nightly builds use very large version numbers that fail this check
++        # FIXME(zacwalk): Enable the assert.
++        # assert filecmp.cmp(rc_res_output[3:], rcpy_res_output[3:])
+     return rc_exe_exit_code
+ 
+   def ExecActionWrapper(self, arch, rspfile, *dirname):
