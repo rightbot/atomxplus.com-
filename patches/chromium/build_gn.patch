@@ -1,0 +1,28 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Ales Pergl <alpergl@microsoft.com>
+Date: Thu, 20 Sep 2018 17:44:29 -0700
+Subject: build_gn.patch
+
+
+diff --git a/build/config/BUILDCONFIG.gn b/build/config/BUILDCONFIG.gn
+index 23695f67293383fe086ce56a7ab6fe08ed28cce7..1d01c7a33634fc749f7498377e96dc0467e698f5 100644
+--- a/build/config/BUILDCONFIG.gn
++++ b/build/config/BUILDCONFIG.gn
+@@ -123,6 +123,9 @@ if (current_os == "") {
+ #   even if the value is overridden, which is wasteful. See first bullet.
+ 
+ declare_args() {
++  is_electron_build = false
++  is_mas_build = false
++
+   # Set to enable the official build level of optimization. This has nothing
+   # to do with branding, but enables an additional level of optimization above
+   # release (!is_debug). This might be better expressed as a tri-state
+@@ -437,6 +440,7 @@ default_compiler_configs = [
+   "//build/config/compiler:thin_archive",
+   "//build/config/coverage:default_coverage",
+   "//build/config/sanitizers:default_sanitizer_flags",
++  "//electron/build/config:mas_build",
+ ]
+ 
+ if (is_win) {
