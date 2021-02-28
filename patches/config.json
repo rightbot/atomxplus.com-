@@ -1,0 +1,9 @@
+{
+  "src/electron/patches/chromium": "src",
+
+  "src/electron/patches/boringssl": "src/third_party/boringssl/src",
+
+  "src/electron/patches/v8":  "src/v8",
+
+  "src/electron/patches/node": "src/third_party/electron_node"
+}
