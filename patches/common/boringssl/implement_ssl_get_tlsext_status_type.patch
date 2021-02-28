@@ -1,0 +1,58 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Jeremy Apthorp <jeremya@chromium.org>
+Date: Thu, 18 Oct 2018 14:18:05 -0700
+Subject: Implement SSL_get_tlsext_status_type
+
+It's used by Node.js[1], and is simple to implement.
+
+[1]: https://github.com/nodejs/node/blob/e2f58c71ddf0f91256cc85e6bb226a068256c5eb/src/node_crypto.cc#L2390
+
+Change-Id: Ie5c76b848623d00f7478aeae0214c25472de523c
+Reviewed-on: https://boringssl-review.googlesource.com/c/32525
+Reviewed-by: David Benjamin <davidben@google.com>
+Commit-Queue: David Benjamin <davidben@google.com>
+CQ-Verified: CQ bot account: commit-bot@chromium.org <commit-bot@chromium.org>
+
+diff --git a/include/openssl/ssl.h b/include/openssl/ssl.h
+index f693030a8a7c4bf79dd791e1abd0e94f8e97a292..3fee95c0a89dc4a25da527e2ac9cc50bab9c35a6 100644
+--- a/include/openssl/ssl.h
++++ b/include/openssl/ssl.h
+@@ -4293,6 +4293,14 @@ OPENSSL_EXPORT int OPENSSL_init_ssl(uint64_t opts,
+ // Use |SSL_enable_ocsp_stapling| instead.
+ OPENSSL_EXPORT int SSL_set_tlsext_status_type(SSL *ssl, int type);
+ 
++// SSL_get_tlsext_status_type returns |TLSEXT_STATUSTYPE_ocsp| if the client
++// requested OCSP stapling and |TLSEXT_STATUSTYPE_nothing| otherwise. On the
++// client, this reflects whether OCSP stapling was enabled via, e.g.,
++// |SSL_set_tlsext_status_type|. On the server, this is determined during the
++// handshake. It may be queried in callbacks set by |SSL_CTX_set_cert_cb|. The
++// result is undefined after the handshake completes.
++OPENSSL_EXPORT int SSL_get_tlsext_status_type(const SSL *ssl);
++
+ // SSL_set_tlsext_status_ocsp_resp sets the OCSP response. It returns one on
+ // success and zero on error. On success, |ssl| takes ownership of |resp|, which
+ // must have been allocated by |OPENSSL_malloc|.
+diff --git a/ssl/ssl_lib.cc b/ssl/ssl_lib.cc
+index c68968a514b76717d4c42448ef4b9c440c330fb2..547be0229e2c60c8aefb4644bc84e96f5a17c7f3 100644
+--- a/ssl/ssl_lib.cc
++++ b/ssl/ssl_lib.cc
+@@ -2896,6 +2896,19 @@ int SSL_set_tlsext_status_type(SSL *ssl, int type) {
+   return 1;
+ }
+ 
++int SSL_get_tlsext_status_type(const SSL *ssl) {
++  if (ssl->server) {
++    SSL_HANDSHAKE *hs = ssl->s3->hs.get();
++    return hs != nullptr && hs->ocsp_stapling_requested
++        ? TLSEXT_STATUSTYPE_ocsp
++        : TLSEXT_STATUSTYPE_nothing;
++  }
++
++  return ssl->config != nullptr && ssl->config->ocsp_stapling_enabled
++             ? TLSEXT_STATUSTYPE_ocsp
++             : TLSEXT_STATUSTYPE_nothing;
++}
++
+ int SSL_set_tlsext_status_ocsp_resp(SSL *ssl, uint8_t *resp, size_t resp_len) {
+   if (SSL_set_ocsp_response(ssl, resp, resp_len)) {
+     OPENSSL_free(resp);
