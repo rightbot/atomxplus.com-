@@ -1,0 +1,99 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Jeremy Apthorp <nornagon@nornagon.net>
+Date: Thu, 20 Sep 2018 17:48:31 -0700
+Subject: libgtkui_export.patch
+
+Export libgtkui symbols for the GN component build.
+
+diff --git a/chrome/browser/ui/libgtkui/gtk_util.h b/chrome/browser/ui/libgtkui/gtk_util.h
+index d9f245070249f5f153bd8fe11e0a5e718c7d3629..a0f033c3e3f7f3996897f5f969b2a209d7d5cf3f 100644
+--- a/chrome/browser/ui/libgtkui/gtk_util.h
++++ b/chrome/browser/ui/libgtkui/gtk_util.h
+@@ -11,6 +11,7 @@
+ #include "ui/base/glib/scoped_gobject.h"
+ #include "ui/native_theme/native_theme.h"
+ #include "ui/views/window/frame_buttons.h"
++#include "chrome/browser/ui/libgtkui/libgtkui_export.h"
+ 
+ namespace aura {
+ class Window;
+@@ -55,10 +56,10 @@ SkColor NormalURLColor(SkColor foreground);
+ // saturation than to look exactly like the foreground color.
+ SkColor SelectedURLColor(SkColor foreground, SkColor background);
+ 
+-void GtkInitFromCommandLine(const base::CommandLine& command_line);
++LIBGTKUI_EXPORT void GtkInitFromCommandLine(const base::CommandLine& command_line);
+ 
+ // Returns the name of the ".desktop" file associated with our running process.
+-std::string GetDesktopName(base::Environment* env);
++LIBGTKUI_EXPORT std::string GetDesktopName(base::Environment* env);
+ 
+ guint GetGdkKeyCodeForAccelerator(const ui::Accelerator& accelerator);
+ 
+@@ -73,7 +74,7 @@ void TurnButtonBlue(GtkWidget* button);
+ 
+ // Sets |dialog| as transient for |parent|, which will keep it on top and center
+ // it above |parent|. Do nothing if |parent| is nullptr.
+-void SetGtkTransientForAura(GtkWidget* dialog, aura::Window* parent);
++LIBGTKUI_EXPORT void SetGtkTransientForAura(GtkWidget* dialog, aura::Window* parent);
+ 
+ // Gets the transient parent aura window for |dialog|.
+ aura::Window* GetAuraTransientParent(GtkWidget* dialog);
+@@ -193,7 +194,7 @@ void RenderBackground(const gfx::Size& size,
+ // Renders a background from the style context created by
+ // GetStyleContextFromCss(|css_selector|) into a 24x24 bitmap and
+ // returns the average color.
+-SkColor GetBgColor(const std::string& css_selector);
++LIBGTKUI_EXPORT SkColor GetBgColor(const std::string& css_selector);
+ 
+ // Renders the border from the style context created by
+ // GetStyleContextFromCss(|css_selector|) into a 24x24 bitmap and
+diff --git a/chrome/browser/ui/libgtkui/skia_utils_gtk.h b/chrome/browser/ui/libgtkui/skia_utils_gtk.h
+index e05fbe9d8b2fe537a5eecbd3642dcc9eb848f3d7..3afca9a72ab69fed0144cfff8159aff5a480c4f5 100644
+--- a/chrome/browser/ui/libgtkui/skia_utils_gtk.h
++++ b/chrome/browser/ui/libgtkui/skia_utils_gtk.h
+@@ -7,6 +7,7 @@
+ 
+ #include <stdint.h>
+ 
++#include "chrome/browser/ui/libgtkui/libgtkui_export.h"
+ #include "third_party/skia/include/core/SkColor.h"
+ 
+ typedef struct _GdkColor GdkColor;
+@@ -41,7 +42,7 @@ const SkBitmap GdkPixbufToImageSkia(GdkPixbuf* pixbuf);
+ // Convert and copy a SkBitmap to a GdkPixbuf. NOTE: this uses BGRAToRGBA, so
+ // it is an expensive operation.  The returned GdkPixbuf will have a refcount of
+ // 1, and the caller is responsible for unrefing it when done.
+-GdkPixbuf* GdkPixbufFromSkBitmap(const SkBitmap& bitmap);
++LIBGTKUI_EXPORT GdkPixbuf* GdkPixbufFromSkBitmap(const SkBitmap& bitmap);
+ 
+ }  // namespace libgtkui
+ 
+diff --git a/chrome/browser/ui/libgtkui/unity_service.h b/chrome/browser/ui/libgtkui/unity_service.h
+index 8d67e1460837c7f8adb151adea131cc6440659a3..95fbb27b6a81e4d73d239e94f5105078a936b5af 100644
+--- a/chrome/browser/ui/libgtkui/unity_service.h
++++ b/chrome/browser/ui/libgtkui/unity_service.h
+@@ -5,18 +5,20 @@
+ #ifndef CHROME_BROWSER_UI_LIBGTKUI_UNITY_SERVICE_H_
+ #define CHROME_BROWSER_UI_LIBGTKUI_UNITY_SERVICE_H_
+ 
++#include "chrome/browser/ui/libgtkui/libgtkui_export.h"
++
+ namespace unity {
+ 
+ // Returns whether unity is currently running.
+-bool IsRunning();
++LIBGTKUI_EXPORT bool IsRunning();
+ 
+ // If unity is running, sets the download counter in the dock icon. Any value
+ // other than 0 displays the badge.
+-void SetDownloadCount(int count);
++LIBGTKUI_EXPORT void SetDownloadCount(int count);
+ 
+ // If unity is running, sets the download progress bar in the dock icon. Any
+ // value between 0.0 and 1.0 (exclusive) shows the progress bar.
+-void SetProgressFraction(float percentage);
++LIBGTKUI_EXPORT void SetProgressFraction(float percentage);
+ 
+ }  // namespace unity
+ 
