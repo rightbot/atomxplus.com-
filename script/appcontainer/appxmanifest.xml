@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+  IgnorableNamespaces="uap uap3">
+  <Identity
+    Name="99999D7F.Electron"
+    ProcessorArchitecture="x64"
+    Publisher="CN=electrontest"
+    Version="1.0.0.0" />
+
+  <Properties>
+    <DisplayName>Electron</DisplayName>
+    <PublisherDisplayName>Electron</PublisherDisplayName>
+    <Logo>Assets\SlackStoreLogo.png</Logo>
+  </Properties>
+
+  <Resources>
+    <Resource Language="EN" />
+    <Resource Language="DE" />
+    <Resource Language="FR" />
+    <Resource Language="ES" />
+    <Resource Language="JA" />
+    <Resource uap:Scale="200" />
+  </Resources>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17692.0" MaxVersionTested="10.0.17692.0" />
+  </Dependencies>
+
+  <Capabilities>
+    <rescap:Capability Name="broadFileSystemAccess"/>
+    <Capability Name="internetClient"/>
+    <Capability Name="internetClientServer"/>
+    <Capability Name="privateNetworkClientServer"/>
+    <Capability Name="allJoyn"/>
+    <uap:Capability Name="documentsLibrary"/>
+    <uap:Capability Name="picturesLibrary"/>
+    <uap:Capability Name="videosLibrary"/>
+    <uap:Capability Name="musicLibrary"/>
+    <uap:Capability Name="enterpriseAuthentication"/>
+    <uap:Capability Name="sharedUserCertificates"/>
+    <uap:Capability Name="userAccountInformation"/>
+    <uap:Capability Name="removableStorage"/>
+    <uap:Capability Name="appointments"/>
+    <uap:Capability Name="contacts"/>
+    <uap:Capability Name="phoneCall"/>
+    <uap:Capability Name="blockedChatMessages"/>
+    <uap:Capability Name="objects3D"/>
+    <DeviceCapability Name="microphone"/>
+    <DeviceCapability Name="bluetooth.genericAttributeProfile"/>
+    <DeviceCapability Name="bluetooth.rfcomm"/>
+    <DeviceCapability Name="humaninterfacedevice"/>
+    <DeviceCapability Name="pointOfService"/>
+    <DeviceCapability Name="serialcommunication"/>
+    <DeviceCapability Name="location"/>
+    <DeviceCapability Name="proximity"/>
+    <DeviceCapability Name="usb"/>
+    <DeviceCapability Name="webcam"/>
+  </Capabilities>
+
+  <Applications>
+    <Application Id="electron" Executable="ShimLauncher64.exe" EntryPoint="Windows.PartialTrustApplication">
+      <uap:VisualElements
+       BackgroundColor="#464646"
+       DisplayName="Electron"
+       Square150x150Logo="Assets\SquareLogo.150x150.png"
+       Square44x44Logo="Assets\SquareLogo.44x44.png"
+       Description="electron" />
+    </Application>
+  </Applications>
+</Package>
