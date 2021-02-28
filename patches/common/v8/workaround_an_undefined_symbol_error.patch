@@ -1,0 +1,75 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Richard Townsend <richard.townsend@arm.com>
+Date: Wed, 24 Apr 2019 13:57:36 +0100
+Subject: Workaround an undefined symbol error
+
+Previously, builds configured with dcheck_always_on=true would error
+with messages like this in the log:
+ lld-link: error: undefined symbol: public: bool __cdecl
+  v8::internal::CPURegister::IsZero(void) const
+
+By moving some functions out of the the arm64-assembler header file,
+this error no longer seems to happen.
+
+diff --git a/src/arm64/assembler-arm64.cc b/src/arm64/assembler-arm64.cc
+index 4408a44770bcc5106bc2dd843ef4954dad7ff7df..df9683fd5e9720255ff6b83e47ec64e2f83f7722 100644
+--- a/src/arm64/assembler-arm64.cc
++++ b/src/arm64/assembler-arm64.cc
+@@ -4013,6 +4013,22 @@ void Assembler::MoveWide(const Register& rd, uint64_t imm, int shift,
+        ImmMoveWide(static_cast<int>(imm)) | ShiftMoveWide(shift));
+ }
+ 
++Instr Assembler::RmNot31(CPURegister rm) {
++  DCHECK_NE(rm.code(), kSPRegInternalCode);
++  DCHECK(!rm.IsZero());
++  return Rm(rm);
++}
++
++Instr Assembler::RdSP(Register rd) {
++  DCHECK(!rd.IsZero());
++  return (rd.code() & kRegCodeMask) << Rd_offset;
++}
++
++Instr Assembler::RnSP(Register rn) {
++  DCHECK(!rn.IsZero());
++  return (rn.code() & kRegCodeMask) << Rn_offset;
++}
++
+ void Assembler::AddSub(const Register& rd, const Register& rn,
+                        const Operand& operand, FlagsUpdate S, AddSubOp op) {
+   DCHECK_EQ(rd.SizeInBits(), rn.SizeInBits());
+diff --git a/src/arm64/assembler-arm64.h b/src/arm64/assembler-arm64.h
+index d814722e6a9eb7b156fc86592cd321682bb68974..2492f30278adae9fb3ff9e995cb9328b4ae8694c 100644
+--- a/src/arm64/assembler-arm64.h
++++ b/src/arm64/assembler-arm64.h
+@@ -2230,11 +2230,7 @@ class V8_EXPORT_PRIVATE Assembler : public AssemblerBase {
+     return rm.code() << Rm_offset;
+   }
+ 
+-  static Instr RmNot31(CPURegister rm) {
+-    DCHECK_NE(rm.code(), kSPRegInternalCode);
+-    DCHECK(!rm.IsZero());
+-    return Rm(rm);
+-  }
++  static Instr RmNot31(CPURegister rm);
+ 
+   static Instr Ra(CPURegister ra) {
+     DCHECK_NE(ra.code(), kSPRegInternalCode);
+@@ -2258,15 +2254,8 @@ class V8_EXPORT_PRIVATE Assembler : public AssemblerBase {
+ 
+   // These encoding functions allow the stack pointer to be encoded, and
+   // disallow the zero register.
+-  static Instr RdSP(Register rd) {
+-    DCHECK(!rd.IsZero());
+-    return (rd.code() & kRegCodeMask) << Rd_offset;
+-  }
+-
+-  static Instr RnSP(Register rn) {
+-    DCHECK(!rn.IsZero());
+-    return (rn.code() & kRegCodeMask) << Rn_offset;
+-  }
++  static Instr RdSP(Register rd);
++  static Instr RnSP(Register rn);
+ 
+   // Flags encoding.
+   inline static Instr Flags(FlagsUpdate S);
