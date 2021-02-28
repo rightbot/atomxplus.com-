@@ -1,0 +1,114 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Cheng Zhao <zcbenz@gmail.com>
+Date: Thu, 20 Sep 2018 17:45:32 -0700
+Subject: can_create_window.patch
+
+
+diff --git a/content/browser/frame_host/render_frame_host_impl.cc b/content/browser/frame_host/render_frame_host_impl.cc
+index ca7881b3b3cd06b9dc89abc477d560a288fe5423..69081399bf0f746a0fd447ac5f8ec360664195ad 100644
+--- a/content/browser/frame_host/render_frame_host_impl.cc
++++ b/content/browser/frame_host/render_frame_host_impl.cc
+@@ -3654,6 +3654,7 @@ void RenderFrameHostImpl::CreateNewWindow(
+           last_committed_origin_, params->window_container_type,
+           params->target_url, params->referrer.To<Referrer>(),
+           params->frame_name, params->disposition, *params->features,
++          params->additional_features, params->body,
+           effective_transient_activation_state, params->opener_suppressed,
+           &no_javascript_access);
+ 
+diff --git a/content/common/frame.mojom b/content/common/frame.mojom
+index f660470b2c612f89a3ad9f0ada4ab13710705b57..45c38198e8fcc44d71ef9440e38d301f8d4951a3 100644
+--- a/content/common/frame.mojom
++++ b/content/common/frame.mojom
+@@ -229,6 +229,10 @@ struct CreateNewWindowParams {
+ 
+   // The window features to use for the new window.
+   blink.mojom.WindowFeatures features;
++
++  // Extra fields added by Electron.
++  array<string> additional_features;
++  network.mojom.URLRequestBody? body;
+ };
+ 
+ // Operation result when the renderer asks the browser to create a new window.
+diff --git a/content/public/browser/content_browser_client.cc b/content/public/browser/content_browser_client.cc
+index b37de5fbf84131cdcb2ee073e746fb18f0f1fc35..b6c528126bde8c7ee8cdf8440ae51cfe1a742b9a 100644
+--- a/content/public/browser/content_browser_client.cc
++++ b/content/public/browser/content_browser_client.cc
+@@ -501,6 +501,8 @@ bool ContentBrowserClient::CanCreateWindow(
+     const std::string& frame_name,
+     WindowOpenDisposition disposition,
+     const blink::mojom::WindowFeatures& features,
++    const std::vector<std::string>& additional_features,
++    const scoped_refptr<network::ResourceRequestBody>& body,
+     bool user_gesture,
+     bool opener_suppressed,
+     bool* no_javascript_access) {
+diff --git a/content/public/browser/content_browser_client.h b/content/public/browser/content_browser_client.h
+index 7fc0a70f4e79544a9cc8dfcc1fa5f670261c4e56..72944bc96a2ec71be1b20fa68e7994445f225824 100644
+--- a/content/public/browser/content_browser_client.h
++++ b/content/public/browser/content_browser_client.h
+@@ -175,6 +175,7 @@ class RenderFrameHost;
+ class RenderProcessHost;
+ class RenderViewHost;
+ class ResourceContext;
++class ResourceRequestBody;
+ class SerialDelegate;
+ class ServiceManagerConnection;
+ class SiteInstance;
+@@ -775,6 +776,8 @@ class CONTENT_EXPORT ContentBrowserClient {
+       const std::string& frame_name,
+       WindowOpenDisposition disposition,
+       const blink::mojom::WindowFeatures& features,
++      const std::vector<std::string>& additional_features,
++      const scoped_refptr<network::ResourceRequestBody>& body,
+       bool user_gesture,
+       bool opener_suppressed,
+       bool* no_javascript_access);
+diff --git a/content/renderer/render_view_impl.cc b/content/renderer/render_view_impl.cc
+index 91c52f9d202efd6232ac602e5dc847737695471d..b71bbc613bdd573546b2cfa89b98220a434169c5 100644
+--- a/content/renderer/render_view_impl.cc
++++ b/content/renderer/render_view_impl.cc
+@@ -76,6 +76,7 @@
+ #include "content/renderer/ime_event_guard.h"
+ #include "content/renderer/internal_document_state_data.h"
+ #include "content/renderer/loader/request_extra_data.h"
++#include "content/renderer/loader/web_url_request_util.h"
+ #include "content/renderer/media/audio/audio_device_factory.h"
+ #include "content/renderer/media/stream/media_stream_device_observer.h"
+ #include "content/renderer/media/video_capture_impl_manager.h"
+@@ -1346,6 +1347,8 @@ WebView* RenderViewImpl::CreateView(
+   }
+   params->features = ConvertWebWindowFeaturesToMojoWindowFeatures(features);
+ 
++  params->body = GetRequestBodyForWebURLRequest(request);
++
+   // We preserve this information before sending the message since |params| is
+   // moved on send.
+   bool is_background_tab =
+diff --git a/content/shell/browser/web_test/web_test_content_browser_client.cc b/content/shell/browser/web_test/web_test_content_browser_client.cc
+index 9e738f90c516cfec18816a183f1a2ab615827307..7e04c82967e3458be32345e683af33b9abc5289e 100644
+--- a/content/shell/browser/web_test/web_test_content_browser_client.cc
++++ b/content/shell/browser/web_test/web_test_content_browser_client.cc
+@@ -299,6 +299,8 @@ bool WebTestContentBrowserClient::CanCreateWindow(
+     const std::string& frame_name,
+     WindowOpenDisposition disposition,
+     const blink::mojom::WindowFeatures& features,
++    const std::vector<std::string>& additional_features,
++    const scoped_refptr<network::ResourceRequestBody>& body,
+     bool user_gesture,
+     bool opener_suppressed,
+     bool* no_javascript_access) {
+diff --git a/content/shell/browser/web_test/web_test_content_browser_client.h b/content/shell/browser/web_test/web_test_content_browser_client.h
+index 1eeb9dafd62e163c7458352de31c62dbd1293f32..0d46e75cdf0a1ef573e733432a4613da850d6f4d 100644
+--- a/content/shell/browser/web_test/web_test_content_browser_client.h
++++ b/content/shell/browser/web_test/web_test_content_browser_client.h
+@@ -67,6 +67,8 @@ class WebTestContentBrowserClient : public ShellContentBrowserClient {
+                        const std::string& frame_name,
+                        WindowOpenDisposition disposition,
+                        const blink::mojom::WindowFeatures& features,
++                       const std::vector<std::string>& additional_features,
++                       const scoped_refptr<network::ResourceRequestBody>& body,
+                        bool user_gesture,
+                        bool opener_suppressed,
+                        bool* no_javascript_access) override;
