@@ -1,0 +1,107 @@
+<html>
+<head>
+  <meta name="referrer" content="always">
+  <link href="../node_modules/mocha/mocha.css" rel="stylesheet">
+  <script src="jquery-2.0.3.min.js"></script>
+</head>
+<body>
+
+<div id="mocha"></div>
+
+<script type="text/javascript" charset="utf-8">
+(function() {
+  // Deprecated APIs are still supported and should be tested.
+  process.throwDeprecation = false
+
+  const path = require('path')
+  const electron = require('electron')
+  const { remote, ipcRenderer } = electron
+
+  // Set up chai-as-promised here first to avoid conflicts
+  // It must be loaded first or really strange things happen inside
+  // chai that cause test failures
+  // DO NOT MOVE, REMOVE OR EDIT THIS LINE
+  require('chai').use(require('chai-as-promised'))
+
+  // Check if we are running in CI.
+  const isCi = remote.getGlobal('isCi')
+
+  if (!isCi) {
+    const win = remote.getCurrentWindow()
+    win.show()
+    win.focus()
+  }
+
+  // Show DevTools.
+  document.oncontextmenu = (e) => {
+    remote.getCurrentWindow().inspectElement(e.clientX, e.clientY)
+  }
+
+  // Rediret all output to browser.
+  if (isCi) {
+    const fakeConsole = {}
+    for (const k in console) {
+      if (console.hasOwnProperty(k) && k !== 'assert') {
+        fakeConsole[k] = (...args) => ipcRenderer.send('console-call', k, args)
+      }
+    }
+    global.__defineGetter__('console', function () {
+      return fakeConsole
+    })
+  }
+
+  const Mocha = require('mocha')
+  const mochaOptions = {}
+  if (process.env.MOCHA_REPORTER) {
+    mochaOptions.reporter = process.env.MOCHA_REPORTER
+  }
+  if (process.env.MOCHA_MULTI_REPORTERS) {
+    mochaOptions.reporterOptions = {
+      reporterEnabled: process.env.MOCHA_MULTI_REPORTERS
+    }
+  }
+  const mocha = new Mocha(mochaOptions)
+
+  if (!process.env.MOCHA_REPORTER) {
+    mocha.ui('bdd').reporter(isCi ? 'tap' : 'html')
+  }
+  mocha.timeout(isCi ? 30000 : 10000)
+
+  const query = Mocha.utils.parseQuery(window.location.search || '')
+  if (query.grep) mocha.grep(query.grep)
+  if (query.invert) mocha.invert()
+
+  // Read all test files.
+  const walker = require('walkdir').walk(path.dirname(__dirname), {
+    no_recurse: true
+  })
+
+  // This allows you to run specific modules only:
+  // npm run test -match=menu
+  const moduleMatch = process.env.npm_config_match
+    ? new RegExp(process.env.npm_config_match, 'g')
+    : null
+
+  const testFiles = []
+  walker.on('file', (file) => {
+    if (/-spec\.js$/.test(file) && (!moduleMatch || moduleMatch.test(file))) {
+      testFiles.push(file)
+    }
+  })
+
+  walker.on('end', () => {
+    testFiles.sort()
+    testFiles.forEach((file) => mocha.addFile(file))
+
+    const runner = mocha.run(() => {
+      // Ensure the callback is called after runner is defined
+      setTimeout(() => {
+        Mocha.utils.highlightTags('code')
+        if (isCi) ipcRenderer.send('process.exit', runner.failures)
+      }, 0)
+    })
+  })
+})()
+</script>
+</body>
+</html>
