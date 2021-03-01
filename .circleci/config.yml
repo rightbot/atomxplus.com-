@@ -1,0 +1,373 @@
+version: 2.1
+
+parameters:
+  upload-to-s3:
+    type: string
+    default: '1'
+
+  run-lint:
+    type: boolean
+    default: true
+
+  run-build-linux:
+    type: boolean
+    default: true
+
+  run-build-mac:
+    type: boolean
+    default: true
+
+  run-linux-x64-publish:
+    type: boolean
+    default: false
+
+  run-linux-ia32-publish:
+    type: boolean
+    default: false
+
+  run-linux-arm-publish:
+    type: boolean
+    default: false
+
+  run-linux-arm64-publish:
+    type: boolean
+    default: false
+
+  run-osx-publish:
+    type: boolean
+    default: false
+
+  run-mas-publish:
+    type: boolean
+    default: false
+
+executors:
+  linux-medium:
+    docker:
+      - image: electronbuilds/electron:0.0.10
+    resource_class: medium
+    parameters:
+      ninja-processes:
+        type: integer
+        default: 3
+    environment:
+      NUMBER_OF_NINJA_PROCESSES: << parameters.ninja-processes >>
+
+  linux-2xlarge:
+    docker:
+      - image: electronbuilds/electron:0.0.10
+    resource_class: 2xlarge+
+    parameters:
+      ninja-processes:
+        type: integer
+        default: 42
+    environment:
+      NUMBER_OF_NINJA_PROCESSES: << parameters.ninja-processes >>
+
+  mac-medium:
+    macos:
+      xcode: "10.3.0"
+    resource_class: medium
+    parameters:
+      ninja-processes:
+        type: integer
+        default: 6
+    environment:
+      NUMBER_OF_NINJA_PROCESSES: << parameters.ninja-processes >>
+
+  mac-large:
+    macos:
+      xcode: "10.3.0"
+    resource_class: large
+    parameters:
+      ninja-processes:
+        type: integer
+        default: 18
+      mase:
+        type: boolean
+        default: false
+    environment:
+      NUMBER_OF_NINJA_PROCESSES: << parameters.ninja-processes >>
+      
+
+commands:
+  send-failure-to-slack:
+    steps:
+      - run:
+          name: Send a Slack notification on failure
+          command: |
+            if [ "$NOTIFY_SLACK" == "true" ]; then
+              export MESSAGE="Build failed for *<$CIRCLE_BUILD_URL|$CIRCLE_JOB>* nightly build from *$CIRCLE_BRANCH*."
+              curl -g -H "Content-Type: application/json" -X POST \
+              -d "{\"text\": \"$MESSAGE\", \"attachments\": \[{\"color\": \"#FC5C3C\",\"title\": \"$CIRCLE_JOB nightly build results\",\"title_link\": \"$CIRCLE_BUILD_URL\"}]}" $SLACK_WEBHOOK
+            fi
+          when: on_fail
+  shortcircuit-docs-only:
+    steps:
+      - run:
+          name: Shortcut build if only docs changed
+          command: |
+            if [ -s src/electron/.skip-ci-build ]; then
+              circleci-agent step halt
+            fi
+  install-gnutar-on-mac:
+    steps:
+      - restore_cache:
+          name: Restore Homebrew Cache
+          paths:
+            - /usr/local/Homebrew
+          keys:
+            - v1-brew-cache-{{ arch }}
+      - run:
+          name: Install gnu-tar on macOS
+          command: |
+            if [ "`uname`" == "Darwin" ]; then
+              brew update
+              brew install gnu-tar
+              ln -fs /usr/local/bin/gtar /usr/local/bin/tar
+            fi
+      - save_cache:
+          name: Persist Homebrew Cache
+          paths:
+            - /usr/local/Homebrew
+          key: v1-brew-cache-{{ arch }}
+  checkout-electron:
+    parameters:
+      save-caches:
+        type: boolean
+        default: true
+    steps:
+      - checkout:
+          path: src/electron
+      # - *step-check-for-doc-only-change
+      # - *step-persist-doc-only-change
+      # - *step-maybe-early-exit-doc-only-change
+      - run:
+          name: Set Up Depot Tools
+          command: |
+            git clone --depth=1 https://chromium.googlesource.com/chromium/tools/depot_tools.git
+            echo 'export PATH="$PATH:'"$PWD"'/depot_tools"' >> $BASH_ENV
+      - install-gnutar-on-mac
+      - run:
+          name: Prepare For Sync
+          command: |
+            # Get some more space on macOS
+            if [ "`uname`" == "Darwin" ]; then
+              sudo rm -rf /Library/Developer/CoreSimulator
+              sudo rm -rf /Applications/Xcode.app/Contents/Developer/Platforms/AppleTVOS.platform
+              sudo rm -rf /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform
+              sudo rm -rf /Applications/Xcode.app/Contents/Developer/Platforms/WatchOS.platform
+              sudo rm -rf /Applications/Xcode.app/Contents/Developer/Platforms/WatchSimulator.platform
+              sudo rm -rf /Applications/Xcode.app/Contents/Developer/Platforms/AppleTVSimulator.platform
+              sudo rm -rf /Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform
+            fi
+            node src/electron/script/generate-deps-hash.js
+            touch src/electron/.circle-sync-done
+
+      - restore_cache:
+          paths:
+            - ./src
+          keys:
+            - v5-src-cache-{{ arch }}-{{ checksum "src/electron/.depshash" }}
+          name: Restoring src cache if available
+      - restore_cache:
+          name: Restoring git cache if required
+          paths:
+            - ~/.gclient-cache
+          keys:
+            - v2-gclient-cache-{{ arch }}-{{ checksum "src/electron/.circle-sync-done" }}-{{ checksum "src/electron/DEPS" }}
+            - v2-gclient-cache-{{ arch }}-{{ checksum "src/electron/.circle-sync-done" }}
+      - run:
+          name: GClient Sync If Required
+          command: |
+            export GIT_CACHE_PATH="$HOME/.gclient-cache"
+            # If we did not restore a complete sync then we need to sync for realz
+            if [ ! -s "src/electron/.circle-sync-done" ]; then
+              gclient config \
+                --name "src/electron" \
+                --unmanaged \
+                $GCLIENT_EXTRA_ARGS \
+                "$CIRCLE_REPOSITORY_URL"
+
+              gclient sync --with_branch_heads --with_tags
+            fi
+      - when:
+          condition: << parameters.save-caches >>
+          steps:
+            - save_cache:
+                paths:
+                  - ~/.gclient-cache
+                key: v2-gclient-cache-{{ arch }}-{{ checksum "src/electron/.circle-sync-done" }}-{{ checksum "src/electron/DEPS" }}
+                name: Persisting git cache
+      # These next few steps reset Electron to the correct commit regardless of which cache was restored
+      - run:
+          name: Wipe Electron
+          command: rm -rf src/electron
+      - checkout:
+          path: src/electron
+      - run:
+          name: Set Up Electron Checkout
+          command: |
+            # Run electron only hooks
+            gclient runhooks --spec="solutions=[{'name':'src/electron','url':None,'deps_file':'DEPS','custom_vars':{'process_deps':False},'managed':False}]"
+            # Prep the deps hash and sync done flag
+            (cd src/electron && git checkout .) && node src/electron/script/generate-deps-hash.js
+            echo DONE > src/electron/.circle-sync-done
+            # Removed unused things
+            rm -rf src/android_webview
+            rm -rf src/ios
+            rm -rf src/third_party/blink/web_tests
+            rm -rf src/third_party/blink/perf_tests
+            rm -rf src/third_party/WebKit/LayoutTests
+      - when:
+          condition: << parameters.save-caches >>
+          steps:
+            - save_cache:
+                paths:
+                  - ./src
+                key: v5-src-cache-{{ arch }}-{{ checksum "src/electron/.depshash" }}
+                name: Persisting src cache
+
+jobs:
+  build-electron:
+    parameters:
+      sccache-bucket:
+        type: string
+        default: electronjs-sccache-ci
+      target-arch:
+        type: enum
+        default: x64
+        enum: ['x64', 'ia32', 'arm', 'arm64']
+      persist-for-tests:
+        type: boolean
+        default: true
+      gn-config:
+        type: enum
+        enum: ['testing', 'release', 'native_tests']
+      mas:
+        type: boolean
+        default: false
+      checkout:
+        type: boolean
+        default: true
+      executor:
+        type: executor
+    executor: << parameters.executor >>
+    steps:
+      - when:
+          condition: << parameters.checkout >>
+          steps:
+            - checkout-electron:
+                save-caches: false
+    environment:
+      TARGET_ARCH: << parameters.target-arch >>
+      NPM_CONFIG_ARCH: << parameters.target-arch >>
+  
+  test-electron:
+    parameters:
+      executor:
+        type: executor
+      parallelism:
+        type: integer
+        default: 2
+    executor: << parameters.executor >>
+    steps:
+      - attach_workspace:
+          at: .
+      - shortcircuit-docs-only
+      - run:
+          name: Set Up Testing Environment
+          command: |
+            echo 'export PATH="$PATH:'"$PWD"'/depot_tools"' >> $BASH_ENV
+            cd src/out/Default
+            for f in *.zip
+            do
+              unzip -o $f
+            done
+            if [ "`uname`" == "Linux" ]; then
+              sh -e /etc/init.d/xvfb start
+              ./src/electron/.circleci/fix-known-hosts.sh
+            fi
+            if [ "`uname`" == "Darwin" ]; then
+              (cd ../../electron && ./script/codesign/import-testing-cert-ci.sh)
+            fi
+      - run:
+          name: Run Electron tests
+          environment:
+            MOCHA_REPORTER: mocha-multi-reporters
+            ELECTRON_TEST_RESULTS_DIR: junit
+            MOCHA_MULTI_REPORTERS: mocha-junit-reporter, tap
+            ELECTRON_DISABLE_SECURITY_WARNINGS: 1
+          command: |
+            cd src
+            export ELECTRON_OUT_DIR=Default
+            (cd electron && node script/yarn test --runners=main --enable-logging --files $(circleci tests glob spec-main/*-spec.ts | circleci tests split))
+            (cd electron && node script/yarn test --runners=remote --enable-logging --files $(circleci tests glob spec/*-spec.js | circleci tests split))
+      - run:
+          name: Check test results existence
+          command: |
+            cd src
+            if [ ! -s "junit/test-results-remote.xml" ]; then
+              exit 1
+            fi
+            if [ ! -s "junit/test-results-main.xml" ]; then
+              exit 1
+            fi
+      - store_test_results:
+          path: src/junit
+      - run:
+          name: Verify mksnapshot
+          command: cd src && python electron/script/verify-mksnapshot.py --source-root "$PWD" --build-dir out/Default
+      - send-failure-to-slack
+
+workflows:
+  build-linux:
+    jobs:
+      - build-electron:
+          name: ia32-testing
+          target-arch: ia32
+          persist-for-tests: true
+          gn-config: testing
+          executor: linux-2xlarge
+      - build-electron:
+          name: x64-testing
+          persist-for-tests: true
+          gn-config: testing
+          executor: linux-2xlarge
+      - test-electron:
+          name: ia32-tests
+          requires:
+            - ia32-testing
+          executor: linux-medium
+          parallelism: 3
+      - test-electron:
+          name: x64-tests
+          requires:
+            - x64-testing
+          executor: linux-medium
+          parallelism: 3
+  build-mac:
+    jobs:
+      - build-electron:
+          name: mac-testing
+          target-arch: x64
+          persist-for-tests: true
+          gn-config: testing
+          executor: mac-large
+      - build-electron:
+          name: mas-testing
+          target-arch: x64
+          persist-for-tests: true
+          gn-config: testing
+          mas: true
+          executor: mac-large
+      - test-electron:
+          name: mac-tests
+          requires:
+            - mac-testing
+          executor: mac-medium
+      - test-electron:
+          name: mas-tests
+          requires:
+            - mas-testing
+          executor: mac-medium
