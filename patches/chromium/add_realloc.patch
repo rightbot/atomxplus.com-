@@ -1,0 +1,83 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Shelley Vohr <shelley.vohr@gmail.com>
+Date: Thu, 20 Sep 2018 17:44:26 -0700
+Subject: add_realloc.patch
+
+Blink overrides ArrayBuffer's allocator with its own one, while Node simply
+uses malloc and free, so we need to use v8's allocator in Node. As part of the
+10.6.0 upgrade, we needed to make SerializerDelegate accept an allocator
+argument in its constructor, and override ReallocateBufferMemory and
+FreeBufferMemory to use the allocator. We cannot simply allocate and then memcpy
+when we override ReallocateBufferMemory, so we therefore need to implement
+Realloc on the v8 side and correspondingly in gin.
+
+diff --git a/gin/array_buffer.cc b/gin/array_buffer.cc
+index a02797e94f61e8c71428633a4585a625dc5aadbd..305b7d307d233af699e3f495f85de0f8097ff311 100644
+--- a/gin/array_buffer.cc
++++ b/gin/array_buffer.cc
+@@ -43,6 +43,10 @@ void* ArrayBufferAllocator::AllocateUninitialized(size_t length) {
+   return malloc(length);
+ }
+ 
++void* ArrayBufferAllocator::Realloc(void* data, size_t length) {
++  return realloc(data, length);
++}
++
+ void ArrayBufferAllocator::Free(void* data, size_t length) {
+   free(data);
+ }
+diff --git a/gin/array_buffer.h b/gin/array_buffer.h
+index 2aef366ac8194aa261cbca6abc051f7da8a988d3..3c7d66c81032636abcca4f1538ce9b7f4ddb2de2 100644
+--- a/gin/array_buffer.h
++++ b/gin/array_buffer.h
+@@ -21,6 +21,7 @@ class ArrayBufferAllocator : public v8::ArrayBuffer::Allocator {
+  public:
+   void* Allocate(size_t length) override;
+   void* AllocateUninitialized(size_t length) override;
++  void* Realloc(void* data, size_t length) override;
+   void Free(void* data, size_t length) override;
+ 
+   GIN_EXPORT static ArrayBufferAllocator* SharedInstance();
+diff --git a/third_party/blink/renderer/bindings/core/v8/v8_initializer.cc b/third_party/blink/renderer/bindings/core/v8/v8_initializer.cc
+index 7fb51da7c03f9bd6bfcb8724710edf72dc81c79e..138a6fca7e85db767dea0e06be735fff81fe9c49 100644
+--- a/third_party/blink/renderer/bindings/core/v8/v8_initializer.cc
++++ b/third_party/blink/renderer/bindings/core/v8/v8_initializer.cc
+@@ -647,6 +647,10 @@ class ArrayBufferAllocator : public v8::ArrayBuffer::Allocator {
+         size, ArrayBufferContents::kDontInitialize);
+   }
+ 
++  void* Realloc(void* data, size_t size) override {
++    return ArrayBufferContents::Realloc(data, size);
++  }
++
+   void Free(void* data, size_t size) override {
+     ArrayBufferContents::FreeMemory(data);
+   }
+diff --git a/third_party/blink/renderer/core/typed_arrays/array_buffer/array_buffer_contents.cc b/third_party/blink/renderer/core/typed_arrays/array_buffer/array_buffer_contents.cc
+index ac525b62a1282839bc906b1ee59837211a83476c..5e6c54b87e88ea2741bc7986bf76ddaa48723e56 100644
+--- a/third_party/blink/renderer/core/typed_arrays/array_buffer/array_buffer_contents.cc
++++ b/third_party/blink/renderer/core/typed_arrays/array_buffer/array_buffer_contents.cc
+@@ -126,6 +126,11 @@ void* ArrayBufferContents::AllocateMemoryOrNull(size_t size,
+   return AllocateMemoryWithFlags(size, policy, base::PartitionAllocReturnNull);
+ }
+ 
++void* ArrayBufferContents::Realloc(void* data, size_t size) {
++  return WTF::Partitions::ArrayBufferPartition()->Realloc(data, size,
++      WTF_HEAP_PROFILER_TYPE_NAME(ArrayBufferContents));
++}
++
+ void ArrayBufferContents::FreeMemory(void* data) {
+   WTF::Partitions::ArrayBufferPartition()->Free(data);
+ }
+diff --git a/third_party/blink/renderer/core/typed_arrays/array_buffer/array_buffer_contents.h b/third_party/blink/renderer/core/typed_arrays/array_buffer/array_buffer_contents.h
+index 1adf4924657624059dcbe4e88cef684478787752..3b14d852b0654309cb53f933e396dc1e7b479790 100644
+--- a/third_party/blink/renderer/core/typed_arrays/array_buffer/array_buffer_contents.h
++++ b/third_party/blink/renderer/core/typed_arrays/array_buffer/array_buffer_contents.h
+@@ -149,6 +149,7 @@ class CORE_EXPORT ArrayBufferContents {
+   void CopyTo(ArrayBufferContents& other);
+ 
+   static void* AllocateMemoryOrNull(size_t, InitializationPolicy);
++  static void* Realloc(void* data, size_t);
+   static void FreeMemory(void*);
+   static DataHandle CreateDataHandle(size_t, InitializationPolicy);
+ 
