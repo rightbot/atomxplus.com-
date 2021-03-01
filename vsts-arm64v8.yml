@@ -1,0 +1,13 @@
+resources:
+  containers:
+  - container: arm64v8-test-container
+    image: electronjs/build:arm64v8-697b894f36d127155e020f4e8ad4b2e5f6a09613
+    options: --shm-size 128m
+
+jobs:
+- job: Test_Arm64
+  container: arm64v8-test-container
+  displayName: Test Arm64 on Arm64 hardware
+  timeoutInMinutes: 30
+  steps:
+  - template: vsts-arm-test-steps.yml
