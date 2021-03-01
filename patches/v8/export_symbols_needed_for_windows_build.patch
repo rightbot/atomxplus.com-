@@ -1,0 +1,33 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Jeremy Apthorp <jeremya@chromium.org>
+Date: Mon, 15 Apr 2019 18:12:08 -0700
+Subject: Export symbols needed for Windows build
+
+These symbols are required to build v8 with BUILD_V8_SHARED on Windows.
+
+diff --git a/src/objects/objects.h b/src/objects/objects.h
+index a6b6cd2d2445f5247e5ec3d5e1cd41972c1fa278..50f575f3ea3a5a24116fafc9cc60123323f50307 100644
+--- a/src/objects/objects.h
++++ b/src/objects/objects.h
+@@ -825,7 +825,7 @@ enum class KeyCollectionMode {
+ // Utility superclass for stack-allocated objects that must be updated
+ // on gc.  It provides two ways for the gc to update instances, either
+ // iterating or updating after gc.
+-class Relocatable {
++class V8_EXPORT_PRIVATE Relocatable {
+  public:
+   explicit inline Relocatable(Isolate* isolate);
+   inline virtual ~Relocatable();
+diff --git a/src/objects/ordered-hash-table.h b/src/objects/ordered-hash-table.h
+index ca1d29d2fd686453747efa2e1d18fedba3883929..db5ab3f57ae2e75e8b90966161359926f70bf7cd 100644
+--- a/src/objects/ordered-hash-table.h
++++ b/src/objects/ordered-hash-table.h
+@@ -63,7 +63,7 @@ namespace internal {
+ //                      deleted elements count.
+ //   [kPrefixSize + 3 + NumberOfDeletedElements()..length]: Not used
+ template <class Derived, int entrysize>
+-class OrderedHashTable : public FixedArray {
++class V8_EXPORT_PRIVATE OrderedHashTable : public FixedArray {
+  public:
+   // Returns an OrderedHashTable (possibly |table|) with enough space
+   // to add at least one new element.

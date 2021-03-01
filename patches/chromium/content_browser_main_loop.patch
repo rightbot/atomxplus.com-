@@ -1,0 +1,22 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: deepak1556 <hop2deep@gmail.com>
+Date: Thu, 18 Oct 2018 17:07:42 -0700
+Subject: content_browser_main_loop.patch
+
+Pass idle quit closure for main message loop, so that pending tasks are
+run before shutdown. This is required to cleanup WebContents asynchronously
+in electron::api::WebContents::ResetManagedWebContents.
+
+diff --git a/content/browser/browser_main_loop.cc b/content/browser/browser_main_loop.cc
+index 80b679406ee9f24b9ef3669b0274bb467dd0a02d..bed72ab5ba6b116c081054c2424831bbc7cc9bbd 100644
+--- a/content/browser/browser_main_loop.cc
++++ b/content/browser/browser_main_loop.cc
+@@ -1409,7 +1409,7 @@ void BrowserMainLoop::MainMessageLoopRun() {
+   NOTREACHED();
+ #else
+   base::RunLoop run_loop;
+-  parts_->PreDefaultMainMessageLoopRun(run_loop.QuitClosure());
++  parts_->PreDefaultMainMessageLoopRun(run_loop.QuitWhenIdleClosure());
+   run_loop.Run();
+ #endif
+ }

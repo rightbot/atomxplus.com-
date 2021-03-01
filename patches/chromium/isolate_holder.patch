@@ -1,0 +1,50 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Samuel Attard <samuel.r.attard@gmail.com>
+Date: Thu, 18 Oct 2018 17:07:27 -0700
+Subject: isolate_holder.patch
+
+Pass pre allocated isolate for initialization, node platform
+needs to register on an isolate so that it can be used later
+down in the initialization process of an isolate.
+
+diff --git a/gin/isolate_holder.cc b/gin/isolate_holder.cc
+index 5633e066f6ec829d050f4d154d618cf664ec8dc0..2604ec42fbb6e04499c660e064a5fa2f676037e2 100644
+--- a/gin/isolate_holder.cc
++++ b/gin/isolate_holder.cc
+@@ -53,7 +53,8 @@ IsolateHolder::IsolateHolder(
+     AccessMode access_mode,
+     AllowAtomicsWaitMode atomics_wait_mode,
+     IsolateType isolate_type,
+-    IsolateCreationMode isolate_creation_mode)
++    IsolateCreationMode isolate_creation_mode,
++    v8::Isolate* isolate)
+     : access_mode_(access_mode), isolate_type_(isolate_type) {
+   DCHECK(task_runner);
+   DCHECK(task_runner->BelongsToCurrentThread());
+@@ -61,7 +62,11 @@ IsolateHolder::IsolateHolder(
+   v8::ArrayBuffer::Allocator* allocator = g_array_buffer_allocator;
+   CHECK(allocator) << "You need to invoke gin::IsolateHolder::Initialize first";
+ 
+-  isolate_ = v8::Isolate::Allocate();
++  if (!isolate) {
++    isolate_ = v8::Isolate::Allocate();
++  } else {
++    isolate_ = isolate;
++  }
+   isolate_data_.reset(
+       new PerIsolateData(isolate_, allocator, access_mode_, task_runner));
+   if (isolate_creation_mode == IsolateCreationMode::kCreateSnapshot) {
+diff --git a/gin/public/isolate_holder.h b/gin/public/isolate_holder.h
+index 689571089c3619f45d2f03df01f83bd73df55ba2..7c50707f2ec40fbf27c956460e4b0e6c8e4db8f7 100644
+--- a/gin/public/isolate_holder.h
++++ b/gin/public/isolate_holder.h
+@@ -76,7 +76,8 @@ class GIN_EXPORT IsolateHolder {
+       AccessMode access_mode,
+       AllowAtomicsWaitMode atomics_wait_mode,
+       IsolateType isolate_type,
+-      IsolateCreationMode isolate_creation_mode = IsolateCreationMode::kNormal);
++      IsolateCreationMode isolate_creation_mode = IsolateCreationMode::kNormal,
++      v8::Isolate* isolate = nullptr);
+   ~IsolateHolder();
+ 
+   // Should be invoked once before creating IsolateHolder instances to

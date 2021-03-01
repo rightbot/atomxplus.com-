@@ -1,0 +1,74 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Cheng Zhao <zcbenz@gmail.com>
+Date: Thu, 20 Sep 2018 17:47:44 -0700
+Subject: gin_enable_disable_v8_platform.patch
+
+We don't use gin to create the V8 platform, because we need to inject Node
+things.
+
+diff --git a/gin/isolate_holder.cc b/gin/isolate_holder.cc
+index 872025f8e29907f90b6b775f1bda4ad2dc19d491..5633e066f6ec829d050f4d154d618cf664ec8dc0 100644
+--- a/gin/isolate_holder.cc
++++ b/gin/isolate_holder.cc
+@@ -107,9 +107,10 @@ IsolateHolder::~IsolateHolder() {
+ // static
+ void IsolateHolder::Initialize(ScriptMode mode,
+                                v8::ArrayBuffer::Allocator* allocator,
+-                               const intptr_t* reference_table) {
++                               const intptr_t* reference_table,
++                               bool create_v8_platform) {
+   CHECK(allocator);
+-  V8Initializer::Initialize(mode);
++  V8Initializer::Initialize(mode, create_v8_platform);
+   g_array_buffer_allocator = allocator;
+   g_reference_table = reference_table;
+ }
+diff --git a/gin/public/isolate_holder.h b/gin/public/isolate_holder.h
+index a8eb7190ddb87405e8d5b810c75d3fac6bab2120..689571089c3619f45d2f03df01f83bd73df55ba2 100644
+--- a/gin/public/isolate_holder.h
++++ b/gin/public/isolate_holder.h
+@@ -89,7 +89,8 @@ class GIN_EXPORT IsolateHolder {
+   // reference pointers. Otherwise, it can be nullptr.
+   static void Initialize(ScriptMode mode,
+                          v8::ArrayBuffer::Allocator* allocator,
+-                         const intptr_t* reference_table = nullptr);
++                         const intptr_t* reference_table = nullptr,
++                         bool create_v8_platform = true);
+ 
+   v8::Isolate* isolate() { return isolate_; }
+ 
+diff --git a/gin/v8_initializer.cc b/gin/v8_initializer.cc
+index 3967c18d2b0b48bee6e095997ba65f59f6aa4dd6..25f492ec675b7de953f5e45d6f768be40b272c3a 100644
+--- a/gin/v8_initializer.cc
++++ b/gin/v8_initializer.cc
+@@ -198,12 +198,14 @@ enum LoadV8FileResult {
+ }  // namespace
+ 
+ // static
+-void V8Initializer::Initialize(IsolateHolder::ScriptMode mode) {
++void V8Initializer::Initialize(IsolateHolder::ScriptMode mode,
++                               bool create_v8_platform) {
+   static bool v8_is_initialized = false;
+   if (v8_is_initialized)
+     return;
+ 
+-  v8::V8::InitializePlatform(V8Platform::Get());
++  if (create_v8_platform)
++    v8::V8::InitializePlatform(V8Platform::Get());
+ 
+   if (!base::FeatureList::IsEnabled(features::kV8OptimizeJavascript)) {
+     // We avoid explicitly passing --opt if kV8OptimizeJavascript is enabled
+diff --git a/gin/v8_initializer.h b/gin/v8_initializer.h
+index 2918c6235688ee4eb7c43387296e6d24145c14aa..069c2c96d5067f0444dac3c6ce6d83f75e770129 100644
+--- a/gin/v8_initializer.h
++++ b/gin/v8_initializer.h
+@@ -20,7 +20,8 @@ namespace gin {
+ class GIN_EXPORT V8Initializer {
+  public:
+   // This should be called by IsolateHolder::Initialize().
+-  static void Initialize(IsolateHolder::ScriptMode mode);
++  static void Initialize(IsolateHolder::ScriptMode mode,
++                         bool create_v8_platform = true);
+ 
+   // Get address and size information for currently loaded snapshot.
+   // If no snapshot is loaded, the return values are null for addresses
